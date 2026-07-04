@@ -1,0 +1,21 @@
+{
+  "doc_a_valid": true,
+  "doc_b_valid": true,
+  "doc_a_reason": "",
+  "doc_b_reason": "",
+  "doc_a_num_tokens": 7,
+  "doc_b_num_tokens": 7,
+  "doc_a_num_shingles": 5,
+  "doc_b_num_shingles": 5,
+  "jaccard_similarity": 1.0,
+  "minhash_similarity": 1.0,
+  "simhash_a": "19f0c3f11058f897",
+  "simhash_b": "19f0c3f11058f897",
+  "simhash_hamming_distance": 0,
+  "simhash_similarity": 1.0,
+  "file_a": "data\\sample_corpus\\doc_01.txt",
+  "file_b": "data\\sample_corpus\\doc_02.txt",
+  "shingle_size": 3,
+  "num_perm": 128,
+  "hash_bits": 64
+}
