@@ -40,3 +40,6 @@ outputs/*
 *.egg-info/
 build/
 dist/
+
+# Keep pair-level prediction details for error analysis
+!outputs/pair_predictions.csv

@@ -245,3 +245,33 @@ Remaining work:
 - generate final metrics.csv
 - write final technical report
 - record short CLI demo video
+
+---
+
+## Pair-Level Error Analysis Output
+
+The `pairs` command can also save pair-level prediction details for error analysis.
+
+Example:
+
+    python -m plagiarism_engine.cli pairs \
+      --pairs data/sample_corpus/sample_pairs.csv \
+      --text-col-a text_a \
+      --text-col-b text_b \
+      --label-col label \
+      --threshold 0.1 \
+      --simhash-threshold 0.65 \
+      --shingle-size 2 \
+      --output outputs/metrics.csv \
+      --details-output outputs/pair_predictions.csv
+
+The details file contains one row per text pair, including:
+
+- true label
+- Jaccard similarity
+- MinHash similarity
+- SimHash similarity
+- prediction of each method
+- error flag of each method
+
+This file is useful for analyzing false positives and false negatives.

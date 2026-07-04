@@ -1,0 +1,6 @@
+jaccard_error,jaccard_prediction,jaccard_similarity,label,minhash_error,minhash_prediction,minhash_similarity,pair_id,simhash_error,simhash_prediction,simhash_similarity,text_a,text_b
+0,1,1.0,1,0,1,1.0,0,0,1,1.0,The quick brown fox jumps over the lazy dog.,The quick brown fox jumps over a lazy dog.
+0,1,0.1,1,0,1,0.1484375,1,1,0,0.5,Machine learning models can detect similar documents.,Machine learning algorithms are able to find similar texts.
+0,0,0.0,0,0,0,0.0,2,0,0,0.578125,Database systems store structured information.,A football team won the match yesterday.
+1,0,0.0,1,1,0,0.0,3,1,0,0.46875,Python is a popular programming language.,Python is widely used for programming and data analysis.
+0,0,0.0,0,0,0,0.0,4,0,0,0.46875,Clouds are visible in the sky.,Relational databases use tables and keys.
