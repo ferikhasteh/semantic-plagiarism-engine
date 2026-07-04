@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "semantic-plagiarism-engine"
+version = "0.1.0"
+description = "A CLI-based semantic duplicate and near-plagiarism detection engine using MinHash, LSH, and SimHash."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+plagiarism-engine = "plagiarism_engine.cli:main"
