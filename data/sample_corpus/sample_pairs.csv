@@ -1,0 +1,6 @@
+text_a,text_b,label
+"The quick brown fox jumps over the lazy dog.","The quick brown fox jumps over a lazy dog.",1
+"Machine learning models can detect similar documents.","Machine learning algorithms are able to find similar texts.",1
+"Database systems store structured information.","A football team won the match yesterday.",0
+"Python is a popular programming language.","Python is widely used for programming and data analysis.",1
+"Clouds are visible in the sky.","Relational databases use tables and keys.",0
