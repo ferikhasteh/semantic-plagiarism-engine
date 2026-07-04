@@ -250,6 +250,7 @@ def command_pairs(args: argparse.Namespace) -> int:
     jaccard_scores: list[float] = []
     minhash_scores: list[float] = []
     simhash_scores: list[float] = []
+    detail_rows: list[dict[str, Any]] = []
 
     def compute_scores() -> None:
         for pair in pairs:
@@ -262,10 +263,36 @@ def command_pairs(args: argparse.Namespace) -> int:
                 hash_bits=args.hash_bits,
             )
 
+            jaccard_score = float(summary["jaccard_similarity"])
+            minhash_score = float(summary["minhash_similarity"])
+            simhash_score = float(summary["simhash_similarity"])
+
+            jaccard_pred = 1 if jaccard_score >= args.threshold else 0
+            minhash_pred = 1 if minhash_score >= args.threshold else 0
+            simhash_pred = 1 if simhash_score >= args.simhash_threshold else 0
+
             y_true.append(pair.label)
-            jaccard_scores.append(float(summary["jaccard_similarity"]))
-            minhash_scores.append(float(summary["minhash_similarity"]))
-            simhash_scores.append(float(summary["simhash_similarity"]))
+            jaccard_scores.append(jaccard_score)
+            minhash_scores.append(minhash_score)
+            simhash_scores.append(simhash_score)
+
+            detail_rows.append(
+                {
+                    "pair_id": pair.pair_id,
+                    "text_a": pair.text_a,
+                    "text_b": pair.text_b,
+                    "label": pair.label,
+                    "jaccard_similarity": jaccard_score,
+                    "minhash_similarity": minhash_score,
+                    "simhash_similarity": simhash_score,
+                    "jaccard_prediction": jaccard_pred,
+                    "minhash_prediction": minhash_pred,
+                    "simhash_prediction": simhash_pred,
+                    "jaccard_error": int(jaccard_pred != pair.label),
+                    "minhash_error": int(minhash_pred != pair.label),
+                    "simhash_error": int(simhash_pred != pair.label),
+                }
+            )
 
     _, runtime_seconds = measure_runtime(compute_scores)
 
@@ -303,6 +330,11 @@ def command_pairs(args: argparse.Namespace) -> int:
     ]
 
     save_metrics_csv(rows, args.output)
+
+    if args.details_output is not None:
+        write_csv(detail_rows, args.details_output)
+        print(f"Saved pair prediction details to {args.details_output}")
+
     print(f"Saved evaluation metrics to {args.output}")
 
     return 0
@@ -359,6 +391,7 @@ def build_parser() -> argparse.ArgumentParser:
     pairs_parser.add_argument("--seed", type=int, default=42)
     pairs_parser.add_argument("--hash-bits", type=int, default=64)
     pairs_parser.add_argument("--output", required=True, type=Path)
+    pairs_parser.add_argument("--details-output", type=Path, default=None)
     pairs_parser.set_defaults(func=command_pairs)
 
     return parser
