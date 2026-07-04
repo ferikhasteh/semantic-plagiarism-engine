@@ -1,3 +1,3 @@
 all_pairs,candidate_pairs,doc_a,doc_b,jaccard_similarity,minhash_similarity,num_documents,reduction_ratio,runtime_seconds
 ,,doc_01.txt,doc_02.txt,1.0,1.0,,,
-3,1,__STATS__,,,,3,0.6666666666666667,0.00026790000265464187
+3,1,__STATS__,,,,3,0.6666666666666667,0.0002663999912329018
