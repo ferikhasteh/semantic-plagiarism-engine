@@ -275,3 +275,68 @@ The details file contains one row per text pair, including:
 - error flag of each method
 
 This file is useful for analyzing false positives and false negatives.
+
+---
+
+## Reproducible Demo
+
+A demo script is provided to regenerate the main outputs:
+
+    bash scripts/run_demo.sh
+
+This script runs:
+
+1. two-document comparison
+2. corpus-level similar document search
+3. labeled pair evaluation
+4. pair-level prediction output for error analysis
+5. PDF report generation
+
+Generated files:
+
+    outputs/two_file_compare.json
+    outputs/candidates.csv
+    outputs/metrics.csv
+    outputs/pair_predictions.csv
+    docs/project_report.pdf
+
+---
+
+## Final Submission Checklist
+
+The final submission includes:
+
+- GitHub repository link
+- CLI-based executable code
+- technical PDF report
+- metrics output file
+- candidate pairs output file
+- pair-level prediction details for error analysis
+- short demo video showing CLI execution
+
+Important files:
+
+    README.md
+    docs/project_report.pdf
+    outputs/metrics.csv
+    outputs/candidates.csv
+    outputs/pair_predictions.csv
+    scripts/run_demo.sh
+
+---
+
+## Suggested Demo Video Scenario
+
+For the short video, run the following commands:
+
+    git status
+
+    pytest tests
+
+    bash scripts/run_demo.sh
+
+    cat outputs/metrics.csv
+
+    cat outputs/candidates.csv
+
+The video only needs to show that the CLI commands run successfully and generate the required outputs.
