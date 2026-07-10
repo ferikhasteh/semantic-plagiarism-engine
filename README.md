@@ -371,23 +371,6 @@ commit شده‌اند تا با گزارش فنی هم‌خوان بمانند.
     scripts/run_demo.sh
     notebooks/exploration.ipynb
 
----
-
-## سناریوی پیشنهادی برای ویدئوی دمو
-
-برای ویدئوی کوتاه، دستورهای زیر را اجرا کنید:
-
-    pytest tests
-
-    bash scripts/run_demo.sh
-
-    cat outputs/candidates.csv
-
-    cat outputs/demo_metrics.csv
-
-    cat outputs/metrics.csv
-
-    head -5 outputs/pair_predictions.csv
 
 مرحله آخر (`cat outputs/metrics.csv`) نتایج واقعی ارزیابی روی ۵۰۰۰ جفت Quora
 Question Pairs را نشان می‌دهد (تولیدشده از قبل، چون `run_demo.sh` آن را دوباره
