@@ -1,0 +1,683 @@
+\documentclass[11pt]{article}
+\usepackage{fontspec}
+\usepackage{babel}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{parskip}
+
+\babelprovide[import, main]{persian}
+\babelfont[persian]{rm}[
+  Path = assets/fonts/,
+  Extension = .ttf,
+  UprightFont = *-Regular,
+  BoldFont = *-Bold,
+]{Vazirmatn}
+\newfontfamily\mycode{DejaVu Sans Mono}
+
+\begin{document}
+
+\begin{center}
+{\Large\bfseries ‏گزارش فنی: موتور تشخیص سرقت ادبی و اسناد مشابه}
+\end{center}
+
+\smallskip
+{\bfseries ‏Semantic Duplicate \& Near-Plagiarism Detection Engine}\smallskip
+
+
+\medskip
+{\large\bfseries ‏۱. معرفی کلی پروژه}\medskip
+
+
+\noindent ‏این پروژه یک موتور خط فرمان برای تشخیص اسناد تکراری، نزدیک به تکراری و از نظر معنایی مشابه پیاده‌سازی می‌کند.\par
+
+\noindent ‏سامانه دو رویکرد اصلی را با یکدیگر مقایسه می‌کند:\par
+
+\noindent ‏1. Shingling + MinHash + LSH\par
+
+\noindent ‏2. TF-IDF Weighted SimHash\par
+
+\noindent ‏هدف پروژه ساخت یک ابزار CLI ماژولار و قابل بازتولید است؛ نه یک پیاده‌سازی صرفاً نوت‌بوکی.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۲. تعریف مسئله}\medskip
+
+
+\noindent ‏با داشتن مجموعه‌ای از اسناد، هدف یافتن جفت‌اسنادی است که شباهت بالایی با یکدیگر دارند.\par
+
+\noindent ‏رویکرد ساده‌لوحانه (naive)، هر سند را با تمام اسناد دیگر مقایسه می‌کند. برای n سند، تعداد مقایسه‌های لازم برابر است با:\par
+
+{\mycode
+\begin{flushleft}
+n(n - 1) / 2
+\end{flushleft}}
+
+\noindent ‏این روش برای مجموعه اسناد بزرگ از نظر محاسباتی بسیار پرهزینه می‌شود. به همین دلیل از روش‌های تقریبی مانند MinHash، LSH و SimHash استفاده می‌شود تا محاسبات کاهش یابد و در عین حال اطلاعات شباهت حفظ شود.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۳. پیش‌پردازش متن}\medskip
+
+
+\noindent ‏هر سند ورودی ابتدا پاکسازی و به یک نمایش یکسان‌سازی‌شده تبدیل می‌شود.\par
+
+\noindent ‏مراحل پیش‌پردازش پیاده‌سازی‌شده:\par
+
+\begin{itemize}
+
+\item ‏یکسان‌سازی یونیکد (Unicode normalization)
+
+\item ‏یکسان‌سازی حروف فارسی/عربی
+
+\item ‏تبدیل به حروف کوچک (lowercasing)
+
+\item ‏حذف تگ‌های HTML
+
+\item ‏حذف URL و ایمیل
+
+\item ‏حذف نشانه‌گذاری و نمادها
+
+\item ‏حذف فاصله‌های اضافه
+
+\item ‏توکن‌سازی در سطح کلمه
+
+\item ‏حذف واژه‌های توقف (stopwords)
+
+\item ‏شینگل‌سازی کلمه‌ای
+
+\end{itemize}
+
+\noindent ‏اندازه پیش‌فرض شینگل:\par
+
+{\mycode
+\begin{flushleft}
+k = 3
+\end{flushleft}}
+
+\noindent ‏برای اسناد بسیار کوتاه یا خالی، سامانه سند را نامعتبر علامت‌گذاری می‌کند و از محاسبه شباهت غیرقابل‌اعتماد پرهیز می‌کند.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۴. شینگل‌سازی کلمه‌ای (Word Shingling)}\medskip
+
+
+\noindent ‏یک شینگل کلمه‌ای، دنباله‌ای از k کلمه متوالی است.\par
+
+\noindent ‏مثال:\par
+
+{\mycode
+\begin{flushleft}
+text = "lion ate zebra and goat" \\
+k = 2
+\end{flushleft}}
+
+\noindent ‏شینگل‌های تولیدشده:\par
+
+{\mycode
+\begin{flushleft}
+(lion, ate) \\
+(ate, zebra) \\
+(zebra, and) \\
+(and, goat)
+\end{flushleft}}
+
+\noindent ‏شینگل‌سازی ترتیب محلی کلمات را حفظ می‌کند. این موضوع اهمیت دارد زیرا ممکن است دو سند کلمات یکسانی داشته باشند اما با ترتیب متفاوت.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۵. شباهت جاکارد دقیق (Exact Jaccard Similarity)}\medskip
+
+
+\noindent ‏پس از شینگل‌سازی، هر سند به‌صورت مجموعه‌ای از شینگل‌ها نمایش داده می‌شود.\par
+
+\noindent ‏برای دو مجموعه شینگل A و B، شباهت جاکارد برابر است با:\par
+
+{\mycode
+\begin{flushleft}
+J(A, B) = |A ∩ B| / |A ∪ B|
+\end{flushleft}}
+
+\noindent ‏این روش دقیق است اما هنگام اعمال روی همه جفت‌اسناد یک مجموعه بزرگ، پرهزینه است.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۶. مین‌هش (MinHash)}\medskip
+
+
+\noindent ‏MinHash برای مجموعه شینگل هر سند یک امضای فشرده تولید می‌کند.\par
+
+\noindent ‏به‌جای مقایسه مستقیم مجموعه‌های بزرگ شینگل، سامانه امضاهای MinHash کوتاه‌تر را مقایسه می‌کند.\par
+
+\noindent ‏در این پیاده‌سازی:\par
+
+{\mycode
+\begin{flushleft}
+num\_perm = 128
+\end{flushleft}}
+
+\noindent ‏شباهت تخمینی بین دو سند از نسبت موقعیت‌های برابر در امضاهای آن‌ها محاسبه می‌شود.\par
+
+\noindent ‏MinHash از صفر و با استفاده از توابع هش قطعی (deterministic) پیاده‌سازی شده است. تابع hash داخلی پایتون به‌عمد استفاده نشده، زیرا بین اجراهای مختلف برنامه تصادفی‌سازی می‌شود.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۷. لوکالیتی سنسیتیو هشینگ (LSH)}\medskip
+
+
+\noindent ‏LSH برای کاهش تعداد مقایسه‌های زوجی استفاده می‌شود.\par
+
+\noindent ‏امضای MinHash به چند باند (band) تقسیم می‌شود.\par
+
+\noindent ‏تنظیم پیش‌فرض:\par
+
+{\mycode
+\begin{flushleft}
+num\_bands = 32
+\end{flushleft}}
+
+\noindent ‏اگر دو سند حداقل در یک باکت (bucket) از یک باند مشترک باشند، به‌عنوان جفت کاندید در نظر گرفته می‌شوند.\par
+
+\noindent ‏مقایسه نهایی و دقیق جاکارد فقط روی جفت‌های کاندید انجام می‌شود، نه روی تمام جفت‌اسناد ممکن.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۸. سیم‌هش وزن‌دار با TF-IDF}\medskip
+
+
+\noindent ‏SimHash برای هر سند یک اثرانگشت (fingerprint) فشرده تولید می‌کند.\par
+
+\noindent ‏روش پیاده‌سازی‌شده از موارد زیر استفاده می‌کند:\par
+
+\begin{itemize}
+
+\item ‏توکن‌های کلمه‌ای
+
+\item ‏فراوانی نرمال‌شده واژه (term frequency)
+
+\item ‏فرکانس سند معکوس هموارشده (smoothed IDF)
+
+\item ‏هش قطعی ۶۴ بیتی
+
+\item ‏فاصله همینگ (Hamming distance)
+
+\end{itemize}
+
+\noindent ‏تنظیم پیش‌فرض:\par
+
+{\mycode
+\begin{flushleft}
+hash\_bits = 64
+\end{flushleft}}
+
+\noindent ‏برای هر توکن، وزن TF-IDF آن به‌صورت مثبت یا منفی در هر موقعیت بیت سهیم می‌شود. اثرانگشت نهایی از روی علامت مقدار انباشته‌شده در هر بعد ساخته می‌شود.\par
+
+\noindent ‏شباهت به‌صورت زیر محاسبه می‌شود:\par
+
+{\mycode
+\begin{flushleft}
+similarity = 1 - hamming\_distance / hash\_bits
+\end{flushleft}}
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۹. دستورهای CLI}\medskip
+
+
+\noindent ‏پروژه سه دستور اصلی CLI ارائه می‌دهد.\par
+
+\smallskip
+{\bfseries ‏۹.۱ مقایسه دو سند}\smallskip
+
+
+{\mycode
+\begin{flushleft}
+python -m plagiarism\_engine.cli compare \textbackslash{} \\
+\hspace*{1.10em}--file-a data/sample\_corpus/doc\_01.txt \textbackslash{} \\
+\hspace*{1.10em}--file-b data/sample\_corpus/doc\_02.txt \textbackslash{} \\
+\hspace*{1.10em}--shingle-size 3 \textbackslash{} \\
+\hspace*{1.10em}--output outputs/two\_file\_compare.json
+\end{flushleft}}
+
+\noindent ‏این دستور موارد زیر را محاسبه می‌کند:\par
+
+\begin{itemize}
+
+\item ‏شباهت جاکارد دقیق
+
+\item ‏شباهت MinHash
+
+\item ‏اثرانگشت‌های SimHash
+
+\item ‏فاصله همینگ SimHash
+
+\item ‏شباهت SimHash
+
+\end{itemize}
+
+\medskip\noindent\hrulefill\medskip
+
+\smallskip
+{\bfseries ‏۹.۲ جست‌وجوی اسناد مشابه در یک مجموعه}\smallskip
+
+
+{\mycode
+\begin{flushleft}
+python -m plagiarism\_engine.cli corpus \textbackslash{} \\
+\hspace*{1.10em}--data data/sample\_corpus \textbackslash{} \\
+\hspace*{1.10em}--threshold 0.1 \textbackslash{} \\
+\hspace*{1.10em}--shingle-size 3 \textbackslash{} \\
+\hspace*{1.10em}--output outputs/candidates.csv
+\end{flushleft}}
+
+\noindent ‏این دستور از موارد زیر استفاده می‌کند:\par
+
+\begin{itemize}
+
+\item ‏پیش‌پردازش
+
+\item ‏شینگل‌سازی
+
+\item ‏MinHash
+
+\item ‏LSH
+
+\item ‏فیلتر نهایی جاکارد
+
+\end{itemize}
+
+\noindent ‏فایل خروجی شامل جفت‌اسناد کاندید و آمار کاهش محاسبات LSH است.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\smallskip
+{\bfseries ‏۹.۳ ارزیابی روی جفت‌های برچسب‌دار}\smallskip
+
+
+{\mycode
+\begin{flushleft}
+python -m plagiarism\_engine.cli pairs \textbackslash{} \\
+\hspace*{1.10em}--pairs data/sample\_corpus/sample\_pairs.csv \textbackslash{} \\
+\hspace*{1.10em}--text-col-a text\_a \textbackslash{} \\
+\hspace*{1.10em}--text-col-b text\_b \textbackslash{} \\
+\hspace*{1.10em}--label-col label \textbackslash{} \\
+\hspace*{1.10em}--threshold 0.1 \textbackslash{} \\
+\hspace*{1.10em}--simhash-threshold 0.65 \textbackslash{} \\
+\hspace*{1.10em}--shingle-size 2 \textbackslash{} \\
+\hspace*{1.10em}--output outputs/metrics.csv
+\end{flushleft}}
+
+\noindent ‏این دستور معیارهای ارزیابی را برای موارد زیر محاسبه می‌کند:\par
+
+\begin{itemize}
+
+\item ‏جاکارد دقیق
+
+\item ‏MinHash
+
+\item ‏SimHash
+
+\end{itemize}
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۱۰. معیارهای ارزیابی}\medskip
+
+
+\noindent ‏معیارهای زیر پیاده‌سازی شده‌اند:\par
+
+\begin{itemize}
+
+\item ‏accuracy (دقت کلی)
+
+\item ‏precision (دقت)
+
+\item ‏recall (بازیابی)
+
+\item ‏F1-score
+
+\item ‏زمان اجرا (runtime)
+
+\end{itemize}
+
+\noindent ‏برای تشخیص دودویی موارد تکراری:\par
+
+{\mycode
+\begin{flushleft}
+prediction = 1 if similarity >= threshold \\
+prediction = 0 otherwise
+\end{flushleft}}
+
+\noindent ‏Precision نشان می‌دهد چند درصد از جفت‌های پیش‌بینی‌شده به‌عنوان تکراری، واقعاً تکراری هستند.\par
+
+\noindent ‏Recall نشان می‌دهد چند درصد از جفت‌های واقعاً تکراری، توسط سامانه تشخیص داده شده‌اند.\par
+
+\noindent ‏F1-score میان precision و recall توازن برقرار می‌کند.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۱۱. دیتاست‌ها}\medskip
+
+
+\noindent ‏دو دیتاست جداگانه در این پروژه استفاده شده است: یک دیتاست کوچک برای آزمایش سریع CLI، و یک دیتاست واقعی برای ارزیابی تجربی.\par
+
+\smallskip
+{\bfseries ‏۱۱.۱ دیتاست نمونه (Smoke Test)}\smallskip
+
+
+\noindent ‏یک دیتاست نمونه کوچک در مسیر زیر قرار داده شده است:\par
+
+{\mycode
+\begin{flushleft}
+data/sample\_corpus/
+\end{flushleft}}
+
+\noindent ‏این دیتاست شامل موارد زیر است:\par
+
+\begin{itemize}
+
+\item ‏اسناد متنی نمونه (برای دستورهای `compare` و `corpus`)
+
+\item ‏یک فایل CSV کوچک از جفت‌های برچسب‌دار (`sample\_pairs.csv`)
+
+\end{itemize}
+
+\noindent ‏این فایل‌ها فقط برای آزمایش سریع صحت CLI و بازتولیدپذیری خروجی‌ها استفاده می‌شوند و حجم آماری کافی برای نتیجه‌گیری تجربی ندارند.\par
+
+\smallskip
+{\bfseries ‏۱۱.۲ دیتاست ارزیابی: Quora Question Pairs}\smallskip
+
+
+\noindent ‏ارزیابی تجربی اصلی روی دیتاست Quora Question Pairs انجام شده است؛ یکی از دو گزینه جایگزین آموزشی معرفی‌شده در راهنمای پروژه به‌جای PAN-PC-11 (به‌دلیل محدودیت حجم/دسترسی اینترنت برای دانلود PAN-PC-11).\par
+
+\noindent ‏فایل خام (`data/raw/quora/train.csv`) طبق سیاست پروژه در Git نادیده گرفته می‌شود و در مخزن قرار نمی‌گیرد؛ فقط خروجی‌های تولیدشده (`outputs/metrics.csv`, `outputs/pair\_predictions.csv`) در مخزن commit شده‌اند.\par
+
+\noindent ‏دستور اجراشده برای تولید نتایج نهایی:\par
+
+{\mycode
+\begin{flushleft}
+python -m plagiarism\_engine.cli pairs \textbackslash{} \\
+\hspace*{1.10em}--pairs data/raw/quora/train.csv \textbackslash{} \\
+\hspace*{1.10em}--text-col-a question1 \textbackslash{} \\
+\hspace*{1.10em}--text-col-b question2 \textbackslash{} \\
+\hspace*{1.10em}--label-col is\_duplicate \textbackslash{} \\
+\hspace*{1.10em}--limit 5000 \textbackslash{} \\
+\hspace*{1.10em}--threshold 0.25 \textbackslash{} \\
+\hspace*{1.10em}--simhash-threshold 0.75 \textbackslash{} \\
+\hspace*{1.10em}--shingle-size 3 \textbackslash{} \\
+\hspace*{1.10em}--output outputs/metrics.csv \textbackslash{} \\
+\hspace*{1.10em}--details-output outputs/pair\_predictions.csv
+\end{flushleft}}
+
+\noindent ‏ویژگی‌های نمونه ارزیابی‌شده:\par
+
+{\mycode
+\begin{flushleft}
+تعداد کل جفت‌ها:      5000 \\
+برچسب ۰ (غیرتکراری):  3089   (٪۶۱.۸) \\
+برچسب ۱ (تکراری):     1911   (٪۳۸.۲)
+\end{flushleft}}
+
+\noindent ‏توزیع برچسب‌ها نامتوازن است؛ این نکته در تفسیر recall و F1 در بخش بعد لحاظ شده است.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۱۲. نتایج تجربی (۵۰۰۰ جفت Quora Question Pairs)}\medskip
+
+
+\noindent ‏نتایج زیر از اجرای واقعی دستور `pairs` روی ۵۰۰۰ جفت سؤال Quora به‌دست آمده‌اند و در مسیر زیر ذخیره شده‌اند:\par
+
+{\mycode
+\begin{flushleft}
+outputs/metrics.csv
+\end{flushleft}}
+
+{\mycode
+\begin{flushleft}
+جاکارد دقیق  | threshold=0.25 | accuracy=0.6288 | precision=0.5316 | recall=0.2423 | F1=0.3329 | TP=463 FP=408 TN=2681 FN=1448 \\
+MinHash      | threshold=0.25 | accuracy=0.6290 | precision=0.5348 | recall=0.2250 | F1=0.3168 | TP=430 FP=374 TN=2715 FN=1481 \\
+SimHash      | threshold=0.75 | accuracy=0.6410 | precision=0.5603 | recall=0.2821 | F1=0.3752 | TP=539 FP=423 TN=2666 FN=1372
+\end{flushleft}}
+
+\noindent ‏زمان اجرا (runtime\_seconds ≈ ۳.۳۷ ثانیه) برای هر سه روش یکسان گزارش شده است، چون در پیاده‌سازی فعلی امتیاز هر سه روش طی یک پیمایش مشترک روی جفت‌ها محاسبه می‌شود و سپس هرکدام جداگانه آستانه‌گذاری می‌شوند؛ این عدد زمان کل محاسبه شباهت برای ۵۰۰۰ جفت را نشان می‌دهد، نه زمان هر روش را به‌تنهایی.\par
+
+\smallskip
+{\bfseries ‏تفسیر نتایج}\smallskip
+
+
+\begin{itemize}
+
+\item ‏MinHash تخمین خوبی از جاکارد دقیق است: accuracy (۰.۶۲۹۰ در برابر ۰.۶۲۸۸) و F1 (۰.۳۱۶۸ در برابر ۰.۳۳۲۹) بسیار نزدیک به جاکارد دقیق هستند. این نشان می‌دهد امضای ۱۲۸ بیتی MinHash (num\_perm=128) برای این حجم داده، تخمین قابل‌اعتمادی از شباهت جاکارد واقعی می‌دهد، در حالی که فقط امضاهای کوتاه مقایسه می‌شوند نه مجموعه‌های کامل شینگل.
+
+\item ‏SimHash بالاترین F1 را ثبت کرده است (۰.۳۷۵۲)، عمدتاً به‌خاطر recall بالاتر (۰.۲۸۲۱ در برابر ۰.۲۲۵۰ تا ۰.۲۴۲۳). وزن‌دهی TF-IDF باعث می‌شود واژه‌های کم‌تکرار و پرمعنا (که معمولاً نشانه موضوع مشترک دو سؤال هستند) سهم بیشتری در اثرانگشت نهایی داشته باشند، در حالی که جاکارد و MinHash فقط هم‌پوشانی شینگل‌های سه‌کلمه‌ای متوالی را می‌سنجند.
+
+\item ‏recall هر سه روش پایین است (زیر ۰.۳). سؤالات Quora اغلب با واژگان کاملاً متفاوت اما معنای یکسان بازنویسی شده‌اند؛ روش‌های مبتنی بر هم‌پوشانی واژگانی به‌طور ذاتی در این نوع جفت‌ها (paraphrasing معنایی بدون هم‌پوشانی لفظی) ضعیف عمل می‌کنند. نمونه‌های واقعی این محدودیت در بخش ۱۶ بررسی شده‌اند.
+
+\item ‏توزیع برچسب نامتوازن (۶۱.۸٪ غیرتکراری) باعث می‌شود accuracy به‌تنهایی معیار گمراه‌کننده‌ای باشد؛ به همین دلیل F1 معیار اصلی مقایسه دو خط‌لوله در این گزارش است.
+
+\end{itemize}
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۱۳. چارچوب تحلیل خطا}\medskip
+
+
+\noindent ‏تحلیل خطا بر دو نوع اشتباه متمرکز است:\par
+
+\begin{itemize}
+
+\item ‏مثبت کاذب (false positive): جفت‌های غیرتکراری که به‌اشتباه تکراری تشخیص داده شده‌اند
+
+\item ‏منفی کاذب (false negative): جفت‌های تکراری که توسط سامانه از قلم افتاده‌اند
+
+\end{itemize}
+
+\noindent ‏این چارچوب در بخش ۱۶ با نمونه‌های واقعی از اجرای روی ۵۰۰۰ جفت Quora اعمال شده است. علل احتمالی زیر پیش از اجرای واقعی به‌عنوان فرضیه در نظر گرفته شدند و در بخش ۱۶ با نمونه واقعی تأیید یا رد شده‌اند.\par
+
+\noindent ‏علل احتمالی مثبت کاذب:\par
+
+\begin{itemize}
+
+\item ‏اندازه شینگل بسیار کوچک
+
+\item ‏واژه‌های عمومی و پرتکرار
+
+\item ‏آستانه شباهت پایین
+
+\end{itemize}
+
+\noindent ‏علل احتمالی منفی کاذب:\par
+
+\begin{itemize}
+
+\item ‏بازنویسی سنگین (paraphrasing)
+
+\item ‏متن‌های بسیار کوتاه
+
+\item ‏اندازه شینگل بسیار بزرگ
+
+\item ‏واژگان متفاوت با معنای مشابه
+
+\end{itemize}
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۱۴. بازتولیدپذیری (Reproducibility)}\medskip
+
+
+\noindent ‏پروژه از طریق موارد زیر بازتولیدپذیر است:\par
+
+\begin{itemize}
+
+\item ‏بذر تصادفی ثابت (fixed random seed) برای MinHash
+
+\item ‏هش قطعی با استفاده از hashlib
+
+\item ‏اجرای خط فرمان
+
+\item ‏خروجی‌های ذخیره‌شده CSV و JSON
+
+\item ‏تست‌های خودکار
+
+\end{itemize}
+
+\noindent ‏اجرای همه تست‌ها:\par
+
+{\mycode
+\begin{flushleft}
+pytest tests
+\end{flushleft}}
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۱۵. جمع‌بندی}\medskip
+
+
+\noindent ‏این پروژه یک موتور کامل تشخیص اسناد نزدیک به تکراری، مبتنی بر CLI، پیاده‌سازی می‌کند.\par
+
+\noindent ‏خط‌لوله MinHash + LSH برای تولید کاندید در مقیاس بزرگ مناسب است، در حالی که SimHash یک روش فشرده و مبتنی بر اثرانگشت برای تخمین سریع شباهت ارائه می‌دهد.\par
+
+\noindent ‏ارزیابی تجربی روی ۵۰۰۰ جفت واقعی از دیتاست Quora Question Pairs (بخش‌های ۱۱ و ۱۲) نشان می‌دهد MinHash تخمین قابل‌اعتمادی از جاکارد دقیق ارائه می‌دهد (F1≈۰.۳۱۷ در برابر ۰.۳۳۳) و SimHash وزن‌دار با TF-IDF به‌خاطر recall بالاتر بهترین F1 (۰.۳۷۵) را در میان سه روش ثبت می‌کند. هر سه روش در برابر جفت‌های با بازنویسی معنایی سنگین (recall زیر ۰.۳) ضعیف عمل می‌کنند، چون شباهت لفظی را می‌سنجند نه شباهت معنایی؛ این محدودیت با نمونه‌های واقعی در بخش ۱۶ مستند شده است.\par
+
+\noindent ‏سامانه نهایی ماژولار، قابل تست، و با ارزیابی تجربی روی یک دیتاست واقعی ۵۰۰۰‌جفتی تکمیل شده است.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۱۶. تحلیل خطای سطح جفت با نمونه‌های واقعی (Pair-Level Error Analysis)}\medskip
+
+
+\noindent ‏سامانه یک فایل خروجی اختیاری از پیش‌بینی‌های سطح جفت تولید می‌کند:\par
+
+{\mycode
+\begin{flushleft}
+outputs/pair\_predictions.csv
+\end{flushleft}}
+
+\noindent ‏این فایل توسط دستور `pairs` و با استفاده از آرگومان `--details-output` تولید می‌شود و از اجرای واقعی روی ۵۰۰۰ جفت Quora حاصل شده است (۵۰۰۰ ردیف). هر ردیف شامل موارد زیر است:\par
+
+\begin{itemize}
+
+\item ‏شناسه جفت (pair id)
+
+\item ‏متن اول و متن دوم
+
+\item ‏برچسب واقعی تکراری بودن
+
+\item ‏شباهت جاکارد دقیق، MinHash و SimHash
+
+\item ‏پیش‌بینی هر روش
+
+\item ‏شاخص خطای هر روش
+
+\end{itemize}
+
+\noindent ‏مثبت کاذب زمانی رخ می‌دهد که برچسب واقعی ۰ باشد اما روش مقدار ۱ را پیش‌بینی کند؛ منفی کاذب زمانی رخ می‌دهد که برچسب واقعی ۱ باشد اما روش مقدار ۰ را پیش‌بینی کند. در ادامه چند نمونه واقعی از این فایل بررسی شده است.\par
+
+\smallskip
+{\bfseries ‏۱۶.۱ نمونه‌های مثبت کاذب (False Positive)}\smallskip
+
+
+\noindent ‏جفت \#۰ (jaccard=۰.۸۳۳، minhash=۰.۷۷۳، آستانه هر دو ۰.۲۵؛ برچسب واقعی=۰):\par
+
+{\mycode
+\begin{flushleft}
+A: "What is the step by step guide to invest in share market in india?" \\
+B: "What is the step by step guide to invest in share market?"
+\end{flushleft}}
+
+\noindent ‏این دو جمله تقریباً یکسان‌اند و هم‌پوشانی شینگلی بسیار بالایی دارند، اما برچسب Quora برای این جفت ۰ است؛ به‌احتمال زیاد چون قید «in India» موضوع را به بازار بورس هند محدود می‌کند در حالی که سؤال دوم عمومی است. این یک تفاوت معنایی ظریف است که هیچ‌کدام از سه روش مبتنی بر هم‌پوشانی لفظی نمی‌توانند تشخیص دهند، چون تقریباً تمام کلمات دو جمله یکسان است.\par
+
+\noindent ‏جفت \#۱۹ (jaccard=۰.۳۳۳، minhash=۰.۳۲۰؛ برچسب واقعی=۰):\par
+
+{\mycode
+\begin{flushleft}
+A: "Which is the best digital marketing institution in banglore?" \\
+B: "Which is the best digital marketing institute in Pune?"
+\end{flushleft}}
+
+\noindent ‏هر دو سؤال از یک قالب مشترک («Which is the best digital marketing institut(e/ion) in <شهر>؟») پیروی می‌کنند و شینگل‌های سه‌کلمه‌ای زیادی مشترک دارند، اما موجودیت کلیدی (نام شهر) که تفاوت واقعی دو سؤال را تعیین می‌کند، فقط یک کلمه از هر جمله را عوض می‌کند. این خطا دقیقاً همان ریسکی است که در بخش ۱۳ پیش‌بینی شده بود: قالب‌های نوشتاری تکراری هم‌پوشانی شینگلی بالایی تولید می‌کنند حتی وقتی موجودیت اصلی جمله متفاوت است.\par
+
+\smallskip
+{\bfseries ‏۱۶.۲ نمونه‌های منفی کاذب (False Negative)}\smallskip
+
+
+\noindent ‏جفت \#۷ (jaccard=۰.۰، minhash=۰.۰، simhash=۰.۵۹۴؛ برچسب واقعی=۱):\par
+
+{\mycode
+\begin{flushleft}
+A: "How can I be a good geologist?" \\
+B: "What should I do to be a great geologist?"
+\end{flushleft}}
+
+\noindent ‏هیچ شینگل سه‌کلمه‌ای مشترکی بین دو جمله وجود ندارد («how can i» در برابر «what should i»)؛ جاکارد و MinHash دقیقاً صفر تخمین می‌زنند. SimHash با وزن‌دهی TF-IDF مقداری هم‌پوشانی (۰.۵۹۴، به‌خاطر واژه مشترک «geologist») تشخیص می‌دهد، اما همچنان زیر آستانه ۰.۷۵ می‌ماند و رد می‌شود.\par
+
+\noindent ‏جفت \#۱۱ (jaccard=۰.۰، minhash=۰.۰، simhash=۰.۷۱۹؛ برچسب واقعی=۱):\par
+
+{\mycode
+\begin{flushleft}
+A: "How do I read and find my YouTube comments?" \\
+B: "How can I see all my Youtube comments?"
+\end{flushleft}}
+
+\noindent ‏مشابه نمونه قبل، تنها یک کلمه محتوایی مشترک («comments»/«Youtube») وجود دارد. SimHash نزدیک‌ترین روش به عبور از آستانه است (۰.۷۱۹ در برابر ۰.۷۵) اما باز هم شکست می‌خورد.\par
+
+\noindent ‏هر دو نمونه بالا محدودیت اصلی مشترک هر سه روش را نشان می‌دهند: آن‌ها شباهت **لفظی/واژگانی** را می‌سنجند، نه شباهت **معنایی**. برای جفت‌هایی که با واژگان کاملاً متفاوت اما مفهوم یکسان بیان شده‌اند، حتی SimHash وزن‌دار با TF-IDF هم به‌سختی به آستانه تشخیص می‌رسد، چون وزن‌دهی همچنان روی هم‌پوشانی واژگان مشترک بنا شده و نمی‌تواند مترادف‌ها را به هم مرتبط کند. رفع این محدودیت نیازمند بازنمایی معنایی (مثل embeddingهای متن) است که خارج از محدوده این پروژه است.\par
+
+\medskip\noindent\hrulefill\medskip
+
+\medskip
+{\large\bfseries ‏۱۷. ویژگی‌های امتیازی (Bonus)}\medskip
+
+
+\noindent ‏علاوه بر دو مسیر الزامی، سه ایده تکمیلی در ماژول مستقل `src/plagiarism\_engine/bonus.py` پیاده‌سازی شده است. این ماژول رفتار سه دستور الزامی CLI (`compare`، `corpus`، `pairs`) را تغییر نمی‌دهد و به‌طور مستقل در `tests/test\_bonus.py` آزموده شده است.\par
+
+\smallskip
+{\bfseries ‏۱۷.۱ تنظیم خودکار پارامترهای LSH}\smallskip
+
+
+\noindent ‏تابع `find\_adaptive\_lsh\_params` به‌جای انتخاب دستی `num\_bands`، جفت (تعداد باند، سطر در هر باند) را که آستانه S-curve آن به یک آستانه شباهت هدف نزدیک‌تر باشد جست‌وجو می‌کند. جست‌وجو فقط مقسوم‌علیه‌های دقیق طول امضا را بررسی می‌کند، زیرا `split\_signature\_into\_bands` نیاز به بخش‌پذیری دقیق دارد.\par
+
+\smallskip
+{\bfseries ‏۱۷.۲ بن‌واژه‌ساز سبک فارسی}\smallskip
+
+
+\noindent ‏تابع `persian\_lemmatize` پسوندهای جمع رایج (`ها`، `های`، `ان`) و پیشوندهای فعل استمراری (`می‌`، `نمی‌`) را حذف می‌کند تا صورت‌های صرفی یک واژه (مانند «دانشجویان» و «دانشجو») در شینگل‌سازی یکسان‌تر دیده شوند. این ابزار یک تحلیل‌گر صرفی کامل نیست؛ صرفاً یک اکتشاف قاعده‌محور و شفاف است.\par
+
+\smallskip
+{\bfseries ‏۱۷.۳ سیم‌هش ترکیبی (کلمه + n-gram کاراکتری)}\smallskip
+
+
+\noindent ‏تابع `hybrid\_simhash` علاوه بر توکن‌های کلمه‌ای، n-gramهای کاراکتری هر کلمه را نیز در محاسبه اثرانگشت دخیل می‌کند. چون چند حرف جابه‌جا یا اشتباه‌تایپ‌شده هنوز بخش زیادی از n-gramهای سه‌کاراکتری یک کلمه را حفظ می‌کند، این روش نسبت به SimHash استاندارد مبتنی بر کلمه، در برابر غلط‌های املایی مقاوم‌تر است.\par
+
+\smallskip
+{\bfseries ‏۱۷.۴ دستور CLI اختیاری}\smallskip
+
+
+{\mycode
+\begin{flushleft}
+python -m plagiarism\_engine.cli bonus-eval \textbackslash{} \\
+\hspace*{1.10em}--pairs data/sample\_corpus/sample\_pairs.csv \textbackslash{} \\
+\hspace*{1.10em}--text-col-a text\_a \textbackslash{} \\
+\hspace*{1.10em}--text-col-b text\_b \textbackslash{} \\
+\hspace*{1.10em}--label-col label \textbackslash{} \\
+\hspace*{1.10em}--threshold 0.1 \textbackslash{} \\
+\hspace*{1.10em}--simhash-threshold 0.5 \textbackslash{} \\
+\hspace*{1.10em}--output outputs/bonus\_metrics.csv
+\end{flushleft}}
+
+\noindent ‏این دستور معیارهای SimHash استاندارد و SimHash ترکیبی را کنار هم مقایسه می‌کند. روی مجموعه نمونه کوچک پروژه، SimHash ترکیبی F1-score بالاتری نسبت به نسخه استاندارد ثبت می‌کند؛ رهگیری کامل و تفسیرشده این نتیجه، به همراه نمونه‌های اجرای تک‌تک توابع بخش امتیازی، در `notebooks/exploration.ipynb` موجود است.\par
+
+\end{document}

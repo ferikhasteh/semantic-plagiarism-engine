@@ -6,6 +6,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from plagiarism_engine.bonus import (
+    build_hybrid_simhash_idf,
+    find_adaptive_lsh_params,
+    hybrid_simhash,
+    persian_lemmatize,
+)
 from plagiarism_engine.dataset import (
     load_labeled_pairs_csv,
     load_text_documents_from_folder,
@@ -340,6 +346,128 @@ def command_pairs(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_bonus_eval(args: argparse.Namespace) -> int:
+    """Optional bonus command: evaluate a labeled pair CSV with the extra
+    (non-required) techniques from bonus.py, side by side with the
+    standard word-level SimHash from the required pipeline:
+
+    - hybrid SimHash (word tokens + character n-grams), for typo/paraphrase
+      resilience
+    - optional light Persian lemmatization of tokens before hashing
+    - the adaptively chosen LSH (bands, rows_per_band) for --num-perm that
+      best approximates --threshold, reported for reference (this command
+      does not itself run LSH candidate generation -- see the `corpus`
+      command for that)
+
+    This command is additive: it does not change the behaviour of
+    `compare`, `corpus`, or `pairs`.
+    """
+
+    pairs = load_labeled_pairs_csv(
+        csv_path=args.pairs,
+        text_col_a=args.text_col_a,
+        text_col_b=args.text_col_b,
+        label_col=args.label_col,
+        limit=args.limit,
+    )
+
+    y_true: list[int] = []
+    standard_scores: list[float] = []
+    hybrid_scores: list[float] = []
+
+    def compute_scores() -> None:
+        for pair in pairs:
+            doc_a = preprocess_document(pair.text_a, shingle_size=args.shingle_size)
+            doc_b = preprocess_document(pair.text_b, shingle_size=args.shingle_size)
+
+            tokens_a = list(doc_a.tokens)
+            tokens_b = list(doc_b.tokens)
+
+            if args.persian_lemmatize:
+                tokens_a = list(persian_lemmatize(tokens_a))
+                tokens_b = list(persian_lemmatize(tokens_b))
+
+            if not tokens_a or not tokens_b:
+                standard_scores.append(0.0)
+                hybrid_scores.append(0.0)
+                y_true.append(pair.label)
+                continue
+
+            standard_idf = build_simhash_idf([tokens_a, tokens_b])
+            standard_a = simhash(tokens_a, idf=standard_idf, hash_bits=args.hash_bits)
+            standard_b = simhash(tokens_b, idf=standard_idf, hash_bits=args.hash_bits)
+            standard_scores.append(
+                simhash_similarity(standard_a, standard_b, hash_bits=args.hash_bits)
+            )
+
+            hybrid_idf = build_hybrid_simhash_idf(
+                [tokens_a, tokens_b],
+                char_ngram_sizes=tuple(args.char_ngram_sizes),
+            )
+            hybrid_a = hybrid_simhash(
+                tokens_a,
+                idf=hybrid_idf,
+                hash_bits=args.hash_bits,
+                char_ngram_sizes=tuple(args.char_ngram_sizes),
+            )
+            hybrid_b = hybrid_simhash(
+                tokens_b,
+                idf=hybrid_idf,
+                hash_bits=args.hash_bits,
+                char_ngram_sizes=tuple(args.char_ngram_sizes),
+            )
+            hybrid_scores.append(
+                simhash_similarity(hybrid_a, hybrid_b, hash_bits=args.hash_bits)
+            )
+
+            y_true.append(pair.label)
+
+    _, runtime_seconds = measure_runtime(compute_scores)
+
+    adaptive_bands, adaptive_rows = find_adaptive_lsh_params(
+        num_perm=args.num_perm,
+        target_threshold=args.threshold,
+    )
+
+    rows = [
+        metrics_row(
+            method="simhash_standard",
+            metrics=evaluate_binary_scores(
+                y_true, standard_scores, threshold=args.simhash_threshold
+            ),
+            runtime_seconds=runtime_seconds,
+            extra={
+                "num_pairs": len(pairs),
+                "persian_lemmatize": args.persian_lemmatize,
+            },
+        ),
+        metrics_row(
+            method="simhash_hybrid_bonus",
+            metrics=evaluate_binary_scores(
+                y_true, hybrid_scores, threshold=args.simhash_threshold
+            ),
+            runtime_seconds=runtime_seconds,
+            extra={
+                "num_pairs": len(pairs),
+                "char_ngram_sizes": ",".join(str(n) for n in args.char_ngram_sizes),
+                "persian_lemmatize": args.persian_lemmatize,
+            },
+        ),
+    ]
+
+    save_metrics_csv(rows, args.output)
+
+    print(
+        "Adaptive LSH suggestion for num_perm="
+        f"{args.num_perm}, target_threshold={args.threshold}: "
+        f"bands={adaptive_bands}, rows_per_band={adaptive_rows} "
+        f"(approx_threshold={(1 / adaptive_bands) ** (1 / adaptive_rows):.4f})"
+    )
+    print(f"Saved bonus evaluation metrics to {args.output}")
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="plagiarism-engine",
@@ -393,6 +521,39 @@ def build_parser() -> argparse.ArgumentParser:
     pairs_parser.add_argument("--output", required=True, type=Path)
     pairs_parser.add_argument("--details-output", type=Path, default=None)
     pairs_parser.set_defaults(func=command_pairs)
+
+    bonus_parser = subparsers.add_parser(
+        "bonus-eval",
+        help=(
+            "Optional: evaluate a labeled pair CSV with the bonus hybrid "
+            "SimHash (word + character n-grams) against the standard "
+            "word-level SimHash. Does not affect compare/corpus/pairs."
+        ),
+    )
+    bonus_parser.add_argument("--pairs", required=True, type=Path)
+    bonus_parser.add_argument("--text-col-a", required=True)
+    bonus_parser.add_argument("--text-col-b", required=True)
+    bonus_parser.add_argument("--label-col", required=True)
+    bonus_parser.add_argument("--limit", type=int, default=None)
+    bonus_parser.add_argument("--threshold", type=float, default=0.25)
+    bonus_parser.add_argument("--simhash-threshold", type=float, default=0.75)
+    bonus_parser.add_argument("--shingle-size", type=int, default=3)
+    bonus_parser.add_argument("--num-perm", type=int, default=128)
+    bonus_parser.add_argument("--hash-bits", type=int, default=64)
+    bonus_parser.add_argument(
+        "--char-ngram-sizes",
+        type=int,
+        nargs="+",
+        default=[3],
+        help="Character n-gram sizes for the hybrid SimHash (default: 3).",
+    )
+    bonus_parser.add_argument(
+        "--persian-lemmatize",
+        action="store_true",
+        help="Apply the light rule-based Persian lemmatizer before hashing.",
+    )
+    bonus_parser.add_argument("--output", required=True, type=Path)
+    bonus_parser.set_defaults(func=command_bonus_eval)
 
     return parser
 

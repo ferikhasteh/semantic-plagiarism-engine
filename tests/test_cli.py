@@ -107,3 +107,79 @@ def test_cli_pairs(tmp_path: Path):
     assert "jaccard_exact" in methods
     assert "minhash" in methods
     assert "simhash" in methods
+
+
+def test_cli_bonus_eval(tmp_path: Path):
+    pairs_csv = tmp_path / "pairs.csv"
+    output = tmp_path / "bonus_metrics.csv"
+
+    pairs_csv.write_text(
+        "question1,question2,is_duplicate\n"
+        "lion ate zebra,lion ate zebre,1\n"
+        "cat drinks milk,python code runs,0\n",
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "bonus-eval",
+            "--pairs",
+            str(pairs_csv),
+            "--text-col-a",
+            "question1",
+            "--text-col-b",
+            "question2",
+            "--label-col",
+            "is_duplicate",
+            "--threshold",
+            "0.1",
+            "--simhash-threshold",
+            "0.5",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+
+    with output.open("r", newline="", encoding="utf-8") as file:
+        rows = list(csv.DictReader(file))
+
+    methods = {row["method"] for row in rows}
+
+    assert "simhash_standard" in methods
+    assert "simhash_hybrid_bonus" in methods
+
+
+def test_cli_bonus_eval_does_not_affect_pairs_command(tmp_path: Path):
+    """bonus-eval must be purely additive: the required `pairs` command
+    should produce identical output whether or not bonus-eval exists."""
+    pairs_csv = tmp_path / "pairs.csv"
+    output = tmp_path / "metrics.csv"
+
+    pairs_csv.write_text(
+        "question1,question2,is_duplicate\n"
+        "lion ate zebra,lion ate zebra and goat,1\n",
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "pairs",
+            "--pairs",
+            str(pairs_csv),
+            "--text-col-a",
+            "question1",
+            "--text-col-b",
+            "question2",
+            "--label-col",
+            "is_duplicate",
+            "--threshold",
+            "0.1",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    assert "jaccard_exact" in output.read_text(encoding="utf-8")

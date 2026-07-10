@@ -1,17 +1,17 @@
-# Semantic Plagiarism Engine
+# موتور تشخیص سرقت ادبی و اسناد مشابه (Semantic Plagiarism Engine)
 
-A command-line plagiarism and near-duplicate detection engine for the Data Mining course project.
+یک ابزار خط فرمان (CLI) برای تشخیص سرقت ادبی و اسناد نزدیک به تکراری، پروژه سوم درس داده‌کاوی.
 
-The project implements and compares two document similarity detection pipelines:
+این پروژه دو خط‌لوله (pipeline) تشخیص شباهت اسناد را پیاده‌سازی و با یکدیگر مقایسه می‌کند:
 
 1. Shingling + MinHash + LSH
 2. TF-IDF Weighted SimHash
 
-The system is designed as a reproducible CLI tool, not as a notebook-only project.
+سامانه به‌گونه‌ای طراحی شده که یک ابزار خط فرمان قابل بازتولید باشد، نه یک پروژه صرفاً نوت‌بوکی.
 
 ---
 
-## Project Structure
+## ساختار پروژه
 
     semantic-plagiarism-engine/
     ├── README.md
@@ -22,7 +22,10 @@ The system is designed as a reproducible CLI tool, not as a notebook-only projec
     │   ├── raw/
     │   └── processed/
     ├── docs/
+    │   ├── project_spec.md   
+    │   └── project_spec.pdf    (خروجی نهایی PDF)
     ├── notebooks/
+    │   └── exploration.ipynb
     ├── outputs/
     ├── src/
     │   └── plagiarism_engine/
@@ -37,98 +40,136 @@ The system is designed as a reproducible CLI tool, not as a notebook-only projec
 
 ---
 
-## Implemented Methods
+## روش‌های پیاده‌سازی‌شده
 
-### 1. Text Preprocessing
+### ۱. پیش‌پردازش متن
 
-The preprocessing module performs:
+ماژول پیش‌پردازش عملیات زیر را انجام می‌دهد:
 
-- text normalization
-- Persian/Arabic character normalization
-- punctuation and extra whitespace removal
-- URL and email removal
-- word-level tokenization
-- stopword removal
-- word shingling
+- یکسان‌سازی متن (normalization)
+- یکسان‌سازی حروف فارسی/عربی
+- حذف نشانه‌گذاری و فاصله‌های اضافه
+- حذف URL و ایمیل
+- توکن‌سازی در سطح کلمه
+- حذف واژه‌های توقف (stopwords)
+- شینگل‌سازی کلمه‌ای (word shingling)
 
-The default shingle size is 3 words.
+اندازه پیش‌فرض شینگل ۳ کلمه است.
 
-### 2. Exact Jaccard Similarity
+### ۲. شباهت جاکارد دقیق (Exact Jaccard)
 
-Each document is represented as a set of word shingles.
+هر سند به‌صورت مجموعه‌ای از شینگل‌های کلمه‌ای نمایش داده می‌شود.
 
-Jaccard similarity is computed as:
+شباهت جاکارد به‌صورت زیر محاسبه می‌شود:
 
     J(A, B) = |A ∩ B| / |A ∪ B|
 
-This method is accurate but expensive for large corpora because all document pairs require comparison.
+این روش دقیق است اما برای مجموعه اسناد بزرگ، به دلیل نیاز به مقایسه همه جفت‌ها، پرهزینه است.
 
-### 3. MinHash
+### ۳. مین‌هش (MinHash)
 
-MinHash creates a compact signature for each document's shingle set.
+MinHash برای مجموعه شینگل هر سند، یک امضای فشرده تولید می‌کند.
 
-The estimated similarity between two documents is computed as the fraction of equal positions in their MinHash signatures.
+شباهت تخمینی بین دو سند از نسبت موقعیت‌های برابر در امضاهای آن‌ها محاسبه می‌شود.
 
-Default signature length:
+طول پیش‌فرض امضا:
 
     num_perm = 128
 
-### 4. Locality Sensitive Hashing
+### ۴. لوکالیتی سنسیتیو هشینگ (LSH)
 
-LSH divides each MinHash signature into bands.
+LSH امضای MinHash را به چند باند (band) تقسیم می‌کند.
 
-Documents that share at least one bucket in at least one band become candidate pairs.
+اسنادی که حداقل در یک باکت (bucket) از یک باند مشترک باشند، به‌عنوان جفت کاندید در نظر گرفته می‌شوند.
 
-This reduces the number of comparisons compared to all-pairs comparison.
+این روش تعداد مقایسه‌ها را نسبت به مقایسه همه‌به‌همه کاهش می‌دهد.
 
-Default setting:
+تنظیم پیش‌فرض:
 
     num_bands = 32
 
-### 5. TF-IDF Weighted SimHash
+### ۵. سیم‌هش وزن‌دار با TF-IDF
 
-SimHash creates a 64-bit fingerprint for each document.
+SimHash برای هر سند یک اثرانگشت (fingerprint) ۶۴ بیتی تولید می‌کند.
 
-Each token contributes to a weighted bit vector using its TF-IDF weight.
+هر توکن با استفاده از وزن TF-IDF خود، در یک بردار بیتی وزن‌دار سهیم می‌شود.
 
-Similarity is computed from Hamming distance:
+شباهت از روی فاصله همینگ محاسبه می‌شود:
 
     similarity = 1 - hamming_distance / hash_bits
 
-Default setting:
+تنظیم پیش‌فرض:
 
     hash_bits = 64
 
+### ویژگی‌های امتیازی (اختیاری، `src/plagiarism_engine/bonus.py`)
+
+سه ایده تکمیلی که رفتار سه دستور الزامی CLI را تغییر نمی‌دهند و به‌طور مستقل در
+`tests/test_bonus.py` آزموده شده‌اند:
+
+- **تنظیم خودکار پارامترهای LSH** (`find_adaptive_lsh_params`): به‌جای انتخاب دستی
+  `num_bands`، جفت (تعداد باند، سطر در هر باند) که به یک آستانه شباهت هدف نزدیک‌ترین
+  باشد را جست‌وجو می‌کند.
+- **بن‌واژه‌ساز سبک فارسی** (`persian_lemmatize`): پسوندهای جمع رایج (`ها`, `های`, `ان`)
+  و پیشوندهای فعل استمراری (`می‌`, `نمی‌`) را حذف می‌کند تا صورت‌های صرفی یک واژه در
+  شینگل‌سازی یکسان‌تر دیده شوند.
+- **سیم‌هش ترکیبی** (`hybrid_simhash`): علاوه بر توکن‌های کلمه‌ای، n-gramهای کاراکتری هر
+  کلمه را نیز در محاسبه اثرانگشت دخیل می‌کند تا در برابر غلط‌های تایپی مقاوم‌تر باشد.
+
+این قابلیت‌ها از طریق دستور اختیاری چهارم CLI در دسترس‌اند:
+
+    python -m plagiarism_engine.cli bonus-eval \
+      --pairs data/sample_corpus/sample_pairs.csv \
+      --text-col-a text_a \
+      --text-col-b text_b \
+      --label-col label \
+      --threshold 0.1 \
+      --simhash-threshold 0.5 \
+      --output outputs/bonus_metrics.csv
+
+خروجی، معیارهای SimHash استاندارد و SimHash ترکیبی را کنار هم مقایسه می‌کند و پیشنهاد
+پارامتر تطبیقی LSH را در خروجی متنی چاپ می‌کند. نمونه کامل و تفسیرشده این قابلیت‌ها در
+`notebooks/exploration.ipynb` (بخش «امتیازی») نیز موجود است.
+
 ---
 
-## Installation
+## نصب
 
-Create a virtual environment:
+ساخت محیط مجازی:
 
     python -m venv .venv
 
-Activate it on Windows Git Bash:
+فعال‌سازی در Windows Git Bash:
 
     source .venv/Scripts/activate
 
-Install dependencies:
+نصب وابستگی‌ها:
 
     pip install -r requirements.txt
     pip install -e .
 
+توجه: گزارش فنی به‌صورت `docs/project_spec.tex` (LaTeX) نگهداری می‌شود و با
+دستور `python scripts/build_report_pdf.py` از روی `docs/project_spec.md`
+بازتولید و با XeLaTeX کامپایل می‌شود تا `docs/project_spec.pdf` ساخته شود. برای
+اجرای این اسکریپت به یک نصب TeX Live (یا معادل آن) با `xelatex`، بسته‌های
+`fontspec` و `babel` نیاز است. فونت فارسی مورد استفاده (Vazirmatn، تحت مجوز
+SIL OFL) در مسیر `assets/fonts/` همراه با پروژه قرار داده شده و نیازی به نصب
+جداگانه فونت نیست؛ فونت انگلیسی/کد (DejaVu Sans Mono) معمولاً همراه هر نصب
+TeX Live یا لینوکس استاندارد موجود است.
+
 ---
 
-## Running Tests
+## اجرای تست‌ها
 
-Run all tests:
+اجرای همه تست‌ها:
 
     pytest tests
 
 ---
 
-## CLI Usage
+## نحوه استفاده از CLI
 
-### 1. Compare Two Documents
+### ۱. مقایسه دو سند
 
     python -m plagiarism_engine.cli compare \
       --file-a data/sample_corpus/doc_01.txt \
@@ -136,21 +177,21 @@ Run all tests:
       --shingle-size 3 \
       --output outputs/two_file_compare.json
 
-Output:
+خروجی:
 
     outputs/two_file_compare.json
 
-The output includes:
+این خروجی شامل موارد زیر است:
 
-- exact Jaccard similarity
-- MinHash similarity
-- SimHash fingerprints
-- SimHash Hamming distance
-- SimHash similarity
+- شباهت جاکارد دقیق
+- شباهت MinHash
+- اثرانگشت‌های SimHash
+- فاصله همینگ SimHash
+- شباهت SimHash
 
 ---
 
-### 2. Search Similar Documents in a Corpus
+### ۲. جست‌وجوی اسناد مشابه در یک مجموعه (Corpus)
 
     python -m plagiarism_engine.cli corpus \
       --data data/sample_corpus \
@@ -158,17 +199,17 @@ The output includes:
       --shingle-size 3 \
       --output outputs/candidates.csv
 
-Output:
+خروجی:
 
     outputs/candidates.csv
 
-The output includes candidate document pairs and LSH reduction statistics.
+این خروجی شامل جفت‌اسناد کاندید و آمار کاهش محاسبات LSH است.
 
 ---
 
-### 3. Evaluate on a Labeled Pair Dataset
+### ۳. ارزیابی روی یک دیتاست جفتی برچسب‌دار
 
-Example for a Quora-like dataset:
+نمونه برای دیتاستی مشابه Quora:
 
     python -m plagiarism_engine.cli pairs \
       --pairs data/raw/quora/train.csv \
@@ -180,79 +221,80 @@ Example for a Quora-like dataset:
       --simhash-threshold 0.75 \
       --output outputs/metrics.csv
 
-Output:
+خروجی:
 
     outputs/metrics.csv
 
-The output includes:
+این خروجی شامل موارد زیر است:
 
-- accuracy
-- precision
-- recall
+- accuracy (دقت کلی)
+- precision (دقت)
+- recall (بازیابی)
 - F1-score
-- runtime
+- زمان اجرا (runtime)
 
-for:
+برای هر سه روش:
 
-- exact Jaccard
+- جاکارد دقیق
 - MinHash
 - SimHash
 
 ---
 
-## Sample Corpus
+## مجموعه نمونه (Sample Corpus)
 
-The repository includes a small sample corpus:
+مخزن شامل یک مجموعه سند نمونه کوچک است:
 
     data/sample_corpus/doc_01.txt
     data/sample_corpus/doc_02.txt
     data/sample_corpus/doc_03.txt
 
-These files are used for quick CLI testing.
+این فایل‌ها برای آزمایش سریع CLI استفاده می‌شوند.
 
 ---
 
-## Data Policy
+## سیاست داده (Data Policy)
 
-Large raw datasets must not be committed to GitHub.
+دیتاست‌های خام بزرگ نباید در GitHub قرار داده شوند.
 
-The following folders are ignored by Git:
+پوشه‌های زیر توسط Git نادیده گرفته می‌شوند:
 
     data/raw/
     data/processed/
 
-Only small sample files and final reproducible outputs should be committed.
+فقط فایل‌های نمونه کوچک و خروجی‌های نهایی قابل بازتولید باید commit شوند.
 
 ---
 
-## Current Status
+## وضعیت فعلی
 
-Implemented:
+پیاده‌سازی‌شده:
 
-- text preprocessing
-- word shingling
-- exact Jaccard similarity
-- MinHash from scratch
-- LSH candidate generation
-- TF-IDF weighted SimHash
-- evaluation metrics
-- dataset loading utilities
-- CLI commands
+- پیش‌پردازش متن
+- شینگل‌سازی کلمه‌ای
+- شباهت جاکارد دقیق
+- MinHash از صفر
+- تولید کاندید با LSH
+- SimHash وزن‌دار با TF-IDF
+- معیارهای ارزیابی
+- ابزارهای بارگذاری دیتاست
+- دستورهای CLI
+- اجرای آزمایش روی دیتاست واقعی Quora Question Pairs (۵۰۰۰ جفت برچسب‌دار)
+- نسخه نهایی `outputs/metrics.csv` و `outputs/pair_predictions.csv` بر پایه نتایج واقعی
+- گزارش فنی نهایی (`docs/project_spec.md` / `.tex` / `.pdf`) شامل تحلیل خطا با نمونه‌های واقعی
 
-Remaining work:
+باقی‌مانده:
 
-- run experiments on a labeled dataset
-- generate final metrics.csv
-- write final technical report
-- record short CLI demo video
+- ضبط ویدئوی کوتاه از اجرای CLI
+- اطمینان از دسترسی استاد و دستیار آموزشی به مخزن GitHub
 
 ---
 
-## Pair-Level Error Analysis Output
+## خروجی تحلیل خطای سطح جفت (Pair-Level Error Analysis)
 
-The `pairs` command can also save pair-level prediction details for error analysis.
+دستور `pairs` می‌تواند جزئیات پیش‌بینی سطح جفت را نیز برای تحلیل خطا ذخیره کند.
 
-Example:
+نمونه:
 
     python -m plagiarism_engine.cli pairs \
       --pairs data/sample_corpus/sample_pairs.csv \
@@ -265,78 +307,90 @@ Example:
       --output outputs/metrics.csv \
       --details-output outputs/pair_predictions.csv
 
-The details file contains one row per text pair, including:
+فایل جزئیات شامل یک ردیف به‌ازای هر جفت متن است، از جمله:
 
-- true label
-- Jaccard similarity
-- MinHash similarity
-- SimHash similarity
-- prediction of each method
-- error flag of each method
+- برچسب واقعی
+- شباهت جاکارد
+- شباهت MinHash
+- شباهت SimHash
+- پیش‌بینی هر روش
+- پرچم خطای هر روش
 
-This file is useful for analyzing false positives and false negatives.
+این فایل برای تحلیل موارد مثبت کاذب (false positive) و منفی کاذب (false negative) کاربردی است.
 
 ---
 
-## Reproducible Demo
+## اجرای دمو به‌صورت بازتولیدپذیر
 
-A demo script is provided to regenerate the main outputs:
+یک اسکریپت دمو برای بازتولید خروجی‌های اصلی ارائه شده است:
 
     bash scripts/run_demo.sh
 
-This script runs:
+این اسکریپت مراحل زیر را اجرا می‌کند:
 
-1. two-document comparison
-2. corpus-level similar document search
-3. labeled pair evaluation
-4. pair-level prediction output for error analysis
-5. PDF report generation
+1. مقایسه دو سند
+2. جست‌وجوی اسناد مشابه در سطح مجموعه
+3. ارزیابی روی جفت‌های برچسب‌دار نمونه (smoke test، نه ارزیابی واقعی)
+4. تولید گزارش PDF
 
-Generated files:
+فایل‌های تولیدشده:
 
     outputs/two_file_compare.json
     outputs/candidates.csv
-    outputs/metrics.csv
-    outputs/pair_predictions.csv
-    docs/project_report.pdf
+    outputs/demo_metrics.csv
+    outputs/demo_pair_predictions.csv
+    docs/project_spec.pdf
+
+توجه: این اسکریپت عمداً `outputs/metrics.csv` و `outputs/pair_predictions.csv` را
+بازتولید نمی‌کند. این دو فایل نتایج واقعی ارزیابی روی ۵۰۰۰ جفت Quora Question
+Pairs هستند (بخش ۱۱.۲ و ۱۲ گزارش فنی) و چون داده خام آن‌ها (`data/raw/quora/train.csv`)
+طبق سیاست پروژه commit نمی‌شود، این خروجی‌ها به‌صورت جداگانه و از پیش تولید و
+commit شده‌اند تا با گزارش فنی هم‌خوان بمانند.
 
 ---
 
-## Final Submission Checklist
+## چک‌لیست تحویل نهایی
 
-The final submission includes:
+تحویل نهایی شامل موارد زیر است:
 
-- GitHub repository link
-- CLI-based executable code
-- technical PDF report
-- metrics output file
-- candidate pairs output file
-- pair-level prediction details for error analysis
-- short demo video showing CLI execution
+- لینک مخزن GitHub
+- کد قابل اجرا از طریق CLI
+- گزارش فنی PDF
+- فایل خروجی معیارها (metrics)
+- فایل خروجی جفت‌اسناد کاندید (candidates)
+- فایل جزئیات پیش‌بینی سطح جفت برای تحلیل خطا
+- ویدئوی کوتاه از اجرای CLI
 
-Important files:
+فایل‌های مهم:
 
     README.md
-    docs/project_report.pdf
+    docs/project_spec.pdf
     outputs/metrics.csv
     outputs/candidates.csv
     outputs/pair_predictions.csv
     scripts/run_demo.sh
+    notebooks/exploration.ipynb
 
 ---
 
-## Suggested Demo Video Scenario
+## سناریوی پیشنهادی برای ویدئوی دمو
 
-For the short video, run the following commands:
-
-    git status
+برای ویدئوی کوتاه، دستورهای زیر را اجرا کنید:
 
     pytest tests
 
     bash scripts/run_demo.sh
 
-    cat outputs/metrics.csv
-
     cat outputs/candidates.csv
 
-The video only needs to show that the CLI commands run successfully and generate the required outputs.
+    cat outputs/demo_metrics.csv
+
+    cat outputs/metrics.csv
+
+    head -5 outputs/pair_predictions.csv
+
+مرحله آخر (`cat outputs/metrics.csv`) نتایج واقعی ارزیابی روی ۵۰۰۰ جفت Quora
+Question Pairs را نشان می‌دهد (تولیدشده از قبل، چون `run_demo.sh` آن را دوباره
+نمی‌سازد)؛ `outputs/demo_metrics.csv` فقط خروجی smoke test روی دیتاست نمونه
+کوچک است. ویدئو فقط باید نشان دهد که دستورهای CLI با موفقیت اجرا می‌شوند و
+خروجی‌های لازم را تولید می‌کنند؛ نیازی به توضیح کلامی نیست.

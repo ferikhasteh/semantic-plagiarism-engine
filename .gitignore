@@ -43,3 +43,12 @@ dist/
 
 # Keep pair-level prediction details for error analysis
 !outputs/pair_predictions.csv
+
+# LaTeX build artifacts (docs/project_spec.tex and .pdf are the deliverables)
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.synctex.gz
